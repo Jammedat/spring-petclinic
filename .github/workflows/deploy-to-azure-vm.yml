@@ -23,7 +23,7 @@ jobs:
         run: mvn clean package
 
       - name: Ensure app directory exists on Azure VM
-        uses: appleboy/scp-action@v0.1.4
+        uses: appleboy/ssh-action@v0.1.4
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USERNAME }}
