@@ -1,0 +1,54 @@
+name: Deploy java app to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v1
+        with:
+          java-version: '17'
+
+      - name: Build JAR
+        run: mvn clean package
+
+      - name: Ensure app directory exists on Azure VM
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            mkdir -p /home/${{ secrets.AZURE_VM_USERNAME }}/app
+        
+      - name: Copy JAR to Azure VM
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          source: target/*.jar
+          target: /home/${{ secrets.AZURE_VM_USERNAME }}/app/
+      
+      - name: SSH into Azure VM and restart app
+        uses: appleboy/ssh-action@v0.1.4
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            echo "Killing any existing Java process..."
+            pkill -f 'java -jar' || true
+
+            echo "Starting new Java app..."
+            nohup java -jar /home/${{ secrets.AZURE_VM_USERNAME }}/app/*.jar > /home/${{ secrets.AZURE_VM_USERNAME }}/app/app.log 2>&1 &
