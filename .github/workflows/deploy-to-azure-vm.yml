@@ -19,36 +19,27 @@ jobs:
         with:
           java-version: '17'
 
-      - name: Build JAR
+      - name: Build with maven
         run: mvn clean package
 
-      - name: Ensure app directory exists on Azure VM
-        uses: appleboy/ssh-action@v0.1.4
+      - name: Azure Login
+        uses: azure/login@v1
         with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          script: |
-            mkdir -p /home/${{ secrets.AZURE_VM_USERNAME }}/app
-        
-      - name: Copy JAR to Azure VM
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          source: target/*.jar
-          target: /home/${{ secrets.AZURE_VM_USERNAME }}/app/
-      
-      - name: SSH into Azure VM and restart app
-        uses: appleboy/ssh-action@v0.1.4
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          script: |
-            echo "Killing any existing Java process..."
-            pkill -f 'java -jar' || true
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-            echo "Starting new Java app..."
-            nohup java -jar /home/${{ secrets.AZURE_VM_USERNAME }}/app/*.jar > /home/${{ secrets.AZURE_VM_USERNAME }}/app/app.log 2>&1 &
+      - name: Upload JAR to VM using az scp
+        run: |
+          az scp --local-path target/*.jar \
+                 --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                 --vm-name ${{ secrets.AZURE_VM_NAME }} \
+                 --username ${{ secrets.AZURE_VM_USERNAME }} \
+                 --destination-path /home/${{ secrets.AZURE_VM_USERNAME }}/app/ \
+                 --recursive
+
+      - name: Run Java App on Azure VM
+        run: |
+          az vm run-command invoke \
+            --command-id RunShellScript \
+            --name ${{ secrets.AZURE_VM_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --scripts "pkill -f 'java -jar' || true && nohup java -jar /home/${{ secrets.AZURE_VM_USERNAME }}/app/*.jar > /home/${{ secrets.AZURE_VM_USERNAME }}/app/app.log 2>&1 &"
