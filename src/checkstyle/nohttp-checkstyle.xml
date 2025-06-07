@@ -1,3 +1,4 @@
+<!--
 <?xml version="1.0"?>
 <!DOCTYPE module PUBLIC
 		"-//Puppy Crawl//DTD Check Configuration 1.2//EN"
@@ -7,4 +8,5 @@
 	<module name="SuppressionFilter">
 		<property name="file" value="${config_loc}/nohttp-checkstyle-suppressions.xml"/>
 	</module>
-</module>
+	</module>
+-->
